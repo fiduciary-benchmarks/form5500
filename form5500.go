@@ -50,8 +50,9 @@ func main() {
 		results, err = runImport(form5500Flag.Section, form5500Flag.Years)
 
 		if err != nil {
+			log.Println(err.Error())
 			utils.CloseDBConnection()
-			log.Fatalf(err.Error())
+			results = append(results, buildErrorResult("", "", "", err))
 		}
 	}
 

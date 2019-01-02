@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	utils "github.com/fiduciary-benchmarks/form5500/internal/utils"
@@ -211,6 +212,12 @@ func createTable(tableName string, year string, section string) (utils.SQLRunner
 	if err != nil {
 		fmt.Println("Could not resolve url: ", url)
 		log.Fatal(err)
+	}
+
+	if resp.StatusCode != 200 {
+		log.Printf("Unable to retrieve Form5500 Data File. Status: %s, Status Code: %s", resp.Status, strconv.Itoa(resp.StatusCode))
+		err := fmt.Errorf("Unable to retrieve Form5500 Data File. Status: %s, Status Code: %s", resp.Status, strconv.Itoa(resp.StatusCode))
+		return utils.SQLRunner{}, err
 	}
 	defer resp.Body.Close()
 
