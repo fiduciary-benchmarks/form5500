@@ -9,12 +9,15 @@ https://www.dol.gov/agencies/ebsa/about-ebsa/our-activities/public-disclosure/fo
 
 ### Usage
 ##### Download csvs and store in specified database (host, password, port are optional)
-  
+
   `form5500 -import -db $DB_NAME -host $HOST -user $USER -password $DB_PASSWORD  -port 5432 -section latest -years 2013,2014,2015`
-  
-##### Parse imported data from specified years and aggregate into form5500_search table 
+
+##### Parse imported data from specified years and aggregate into form5500_search table
   `form5500 -build -section latest -years 2013,2014,2015`
-  
+
+#### Optionally, provide a new rk mapping file and/or create a jira ticket to map unknown recordkeepers
+  `./form5500 -build -db form5500_data -section all -years 2015,2016,2017,2018 -rk-mapping-file rk_mappingx.csv -jira-user "lgabriel@fiduciarybenchmarks.com" -jira-token "<your_token_here>" -jira-assignee "lgabriel"`
+
 ##### Options
 ```
 Usage of form5500:
@@ -72,7 +75,7 @@ Run these queries to see what sort of data is actually available to connecting a
 ```
 root@dc15e85f96ce:/opt/client_data_import/scripts/staging# PGPASSWORD=$FORM5500_RDS_PASSWORD psql -h $FORM5500_RDS_ENDPOINT -U $FORM5500_RDS_USER -d $FORM5500_RDS_NAME -a -w -c "select MIN(ack_id), MAX(ack_id) from form_5500_search;"
 select MIN(ack_id), MAX(ack_id) from form_5500_search;
-              min               |              max               
+              min               |              max
 --------------------------------+--------------------------------
  20140102080855P030152717379001 | 20180625230109P040010367981001
 (1 row)
@@ -80,7 +83,7 @@ select MIN(ack_id), MAX(ack_id) from form_5500_search;
 
 root@dc15e85f96ce:/opt/client_data_import/scripts/staging# PGPASSWORD=$FORM5500_RDS_PASSWORD psql -h $FORM5500_RDS_ENDPOINT -U $FORM5500_RDS_USER -d $FORM5500_RDS_NAME -a -w -c "select count(*) from form_5500_search;"
 select count(*) from form_5500_search;
-  count  
+  count
 ---------
  3467376
 (1 row)
@@ -88,7 +91,7 @@ select count(*) from form_5500_search;
 
 root@dc15e85f96ce:/opt/client_data_import/scripts/staging# PGPASSWORD=$FORM5500_RDS_PASSWORD psql -h $FORM5500_RDS_ENDPOINT -U $FORM5500_RDS_USER -d $FORM5500_RDS_NAME -a -w -c "select count(*) from form5500_search_view;"
 select count(*) from form5500_search_view;
-  count  
+  count
 ---------
  1003885
 (1 row)
