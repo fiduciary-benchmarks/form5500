@@ -20,6 +20,7 @@ var sslFlag = flag.String("ssl", "disable", "connection sslmode: require, verify
 var yearsFlag = flag.String("years", "", "Specify form5500 year")
 var sectionFlag = flag.String("section", "", "Specify form5500 section ('all' or 'latest')")
 
+var rkMappingFile = flag.String("rk-mapping-file", "", "csv file containing rk_name to company_id mapping")
 var jiraCreator = flag.String("jira-user", "", "jira user to auto-create issues")
 var jiraToken = flag.String("jira-token", "", "api token for specified jira issue creation user")
 var jiraAssignee = flag.String("jira-assignee", "", "user to assign auto-created issues to")
@@ -61,7 +62,7 @@ func main() {
 	}
 
 	if *isBuildFlag {
-		rebuildSearchTable(form5500Flag.Section, form5500Flag.Years)
+		rebuildSearchTable(form5500Flag.Section, form5500Flag.Years, *rkMappingFile)
 		if *jiraCreator != "" && *jiraToken != "" && *jiraAssignee != "" {
 			findUnmatchedRks(*jiraCreator, *jiraToken, *jiraAssignee)
 		}

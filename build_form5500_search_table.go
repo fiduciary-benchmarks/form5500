@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bufio"
+	"encoding/csv"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	utils "github.com/fiduciary-benchmarks/form5500/internal/utils"
@@ -10,10 +15,10 @@ import (
 
 const form5500Search string = "form_5500_search"
 
-func rebuildSearchTable(section string, years []string) {
+func rebuildSearchTable(section string, years []string, rkMappingFile string) {
 	fmt.Println("Building form_5500_search table...")
 
-	for _, statement := range getRebuildStatements(section, years) {
+	for _, statement := range getRebuildStatements(section, years, rkMappingFile) {
 		statement.Exec()
 	}
 }
@@ -43,7 +48,7 @@ func findUnmatchedRks(jiraCreator string, jiraToken string, jiraAssignee string)
 
 //private
 
-func getRebuildStatements(section string, years []string) []utils.SQLRunner {
+func getRebuildStatements(section string, years []string, rkMappingFile string) []utils.SQLRunner {
 	var executableStatements []utils.SQLRunner
 
 	for _, statement := range getDropAndCreateSearchTableStatements() {
@@ -79,6 +84,22 @@ func getRebuildStatements(section string, years []string) []utils.SQLRunner {
 
 	//remove junk rows
 	executableStatements = append(executableStatements, getRemoveNoAssetRecords())
+
+	//rebuild the rebuild sched_c_provider_to_fbi_rk_company_id_mappings table but only if we were given a good file
+	err := validateCsvFile(rkMappingFile)
+	if err != nil {
+		fmt.Println("could not find rk mapping file")
+	} else {
+		//rebuild sched_c_provider_to_fbi_rk_company_id_mappings table
+		for _, statement := range getDropAndCreateRkMappingTableStatements() {
+			executableStatements = append(executableStatements, statement)
+		}
+
+		//populate sched_c_provider_to_fbi_rk_company_id_mappings table
+		importRkMappings(rkMappingFile)
+	}
+	//update rk_mappings
+	executableStatements = append(executableStatements, getUpdateRkMappings())
 
 	// - Create materialized view form5500_search_view
 	executableStatements = append(executableStatements, getCreateMaterializedViewStatement())
@@ -180,4 +201,74 @@ func getUnmatchedRksStatement() utils.SQLRunner {
 		DROP TABLE IF EXISTS match_options;`),
 		Description: fmt.Sprintf("Finding unmatched rks and suggested matches"),
 	}
+}
+
+func getDropAndCreateRkMappingTableStatements() []utils.SQLRunner {
+	var statements []utils.SQLRunner
+	statements = append(statements, utils.SQLRunner{Statement: "DROP TABLE IF EXISTS sched_c_provider_to_fbi_rk_company_id_mappings;", Description: "drop sched_c_provider_to_fbi_rk_company_id_mappings table"})
+	statements = append(statements, utils.SQLRunner{Statement: "CREATE TABLE sched_c_provider_to_fbi_rk_company_id_mappings ( sched_c_provider_name text PRIMARY KEY, fbi_company_id INTEGER NOT NULL);", Description: "create sched_c_provider_to_fbi_rk_company_id_mappings table"})
+	return statements
+}
+
+func getUpdateRkMappings() utils.SQLRunner {
+	return utils.SQLRunner{Statement: `UPDATE  form_5500_search
+	SET rk_company_id = fbi_company_id
+	FROM sched_c_provider_to_fbi_rk_company_id_mappings
+	WHERE rk_name=sched_c_provider_name`,
+		Description: "Updating records with new rk mappings"}
+}
+
+func importRkMappings(fname string) ([]utils.SQLRunner, error) {
+	var statements []utils.SQLRunner
+	file, err := os.Open(fname)
+	if err != nil {
+		return statements, fmt.Errorf("Error opening file: %v", err)
+	}
+	defer file.Close()
+	bufReader := bufio.NewReader(file)
+	csvReader := csv.NewReader(bufReader)
+	var sql, errMsg string
+	lines := 0
+	for {
+		line, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return statements, fmt.Errorf("Error reading file: %v", err)
+		}
+		if len(line) != 2 {
+			return statements, fmt.Errorf("Unexpected line: %v", line)
+		}
+		if line[0] == "" && line[1] == "" { //quit when we find an empty line
+			errMsg = "Found a line with no data, stopping reading now, repair your file if data was truncated."
+			break
+		}
+		name := strings.Replace(line[0], "'", "''", -1)
+		id, _ := strconv.Atoi(line[1])
+		if id != 0 { //conversion returns 0 if it's not a number, probably the header line, and in any case not valid
+			sql = fmt.Sprintf("INSERT INTO sched_c_provider_to_fbi_rk_company_id_mappings (sched_c_provider_name, fbi_company_id) VALUES ('%v',%d);", name, id)
+			statements = append(statements, utils.SQLRunner{Statement: sql, Description: "Importing rk company id mapping"})
+			lines++
+		}
+	}
+	if errMsg != "" {
+		return statements, errors.New(errMsg)
+	}
+	return statements, nil
+}
+
+func validateCsvFile(fname string) error {
+	file, err := os.Open(fname)
+	if err != nil {
+		return fmt.Errorf("Error opening file: %v", err)
+	}
+	defer file.Close()
+	bufReader := bufio.NewReader(file)
+	csvReader := csv.NewReader(bufReader)
+	_, err = csvReader.Read()
+	if err != nil {
+		return fmt.Errorf("Error reading file: %v", err)
+	}
+	return nil
 }
