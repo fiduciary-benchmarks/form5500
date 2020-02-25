@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"os"
 	"strings"
@@ -26,7 +27,8 @@ func findUnmatchedRks(jiraCreator string, jiraToken string, jiraAssignee string)
 	defer rows.Close()
 	f, err := os.Create("unmatched_rks.csv")
 	defer f.Close()
-	fmt.Fprintln(f, "rk_name, possible_match, company_id, similarity")
+	w := csv.NewWriter(f)
+	w.Write([]string{"rk_name", "possible_match", "company_id", "similarity"})
 	for rows.Next() {
 		var name, match_name string
 		var match_id, match_score string
@@ -35,9 +37,11 @@ func findUnmatchedRks(jiraCreator string, jiraToken string, jiraAssignee string)
 			fmt.Println("error scanning ", scErr)
 			return
 		}
-		str := fmt.Sprintf("%v,%v,%v,%v", name, match_name, match_id, match_score)
-		fmt.Fprintln(f, strings.Replace(str, "-1", "", -1))
+		match_id = strings.Replace(match_id, "-1", "", -1)
+		match_score = strings.Replace(match_score, "-1", "", -1)
+		w.Write([]string{name, match_name, match_id, match_score})
 	}
+	w.Flush()
 	utils.CreateJiraIssue(jiraCreator, jiraToken, jiraAssignee)
 }
 
