@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 )
+
 // Mapping is used to map column names in short/long form tables to an alias
 // stored on form5500_search_view
 type Mapping struct {
@@ -15,7 +16,6 @@ type Mapping struct {
 // TableMappings returns array of Mapping instances
 // Mapping{} should not be called in usage, declare all instances within this method
 func TableMappings() []Mapping {
-	
 	mappings := []Mapping{
 		{
 			LongForm:  "\"ACK_ID\"",
@@ -120,8 +120,8 @@ func TableMappings() []Mapping {
 			DataType:  "text",
 		},
 		{
-			LongForm:  "\"ADMIN_SIGNED_NAME\"",
-			ShortForm: "\"SF_ADMIN_SIGNED_NAME\"",
+			LongForm:  "COALESCE(\"ADMIN_SIGNED_NAME\", \"ADMIN_MANUAL_SIGNED_NAME\")",
+			ShortForm: "COALESCE(\"SF_ADMIN_SIGNED_NAME\", \"SF_ADMIN_MANUAL_SIGNED_NAME\")",
 			Alias:     "admin_signed_name",
 			DataType:  "text",
 		},
@@ -187,4 +187,4 @@ func TableMappings() []Mapping {
 // IndexName transforms alias as "idx_column_name"
 func (m Mapping) IndexName() string {
 	return fmt.Sprintf("idx_%s", m.Alias)
-} 
+}
